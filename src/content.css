@@ -1,0 +1,334 @@
+/* YouTube 实时字幕跟随 —— 面板样式（全部限定在 #ytt-root 下，避免污染页面） */
+
+#ytt-root {
+  display: contents;
+
+  /* 亮色主题 */
+  --ytt-bg: rgba(255, 255, 255, 0.97);
+  --ytt-fg: #0f0f0f;
+  --ytt-dim: #606060;
+  --ytt-line: rgba(0, 0, 0, 0.12);
+  --ytt-hl: rgba(6, 95, 212, 0.12);
+  --ytt-hlbar: #065fd4;
+  --ytt-solid: #ffffff;
+  --ytt-btn: #f2f2f2;
+  --ytt-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
+
+  font-family: "Roboto", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ytt-fg);
+  /* 关键：让字幕可以被划选 */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+html[dark] #ytt-root {
+  --ytt-bg: rgba(22, 22, 22, 0.97);
+  --ytt-fg: #f1f1f1;
+  --ytt-dim: #aaaaaa;
+  --ytt-line: rgba(255, 255, 255, 0.14);
+  --ytt-hl: rgba(62, 166, 255, 0.22);
+  --ytt-hlbar: #3ea6ff;
+  --ytt-solid: #272727;
+  --ytt-btn: #303030;
+  --ytt-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+}
+
+#ytt-root *,
+#ytt-root *::before,
+#ytt-root *::after {
+  box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------------ 面板 */
+
+#ytt-panel {
+  position: fixed;
+  top: 76px;
+  left: 16px;
+  width: 380px;
+  height: 70vh;
+  min-width: 240px;
+  min-height: 160px;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ytt-bg);
+  color: var(--ytt-fg);
+  border: 1px solid var(--ytt-line);
+  border-radius: 12px;
+  box-shadow: var(--ytt-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+#ytt-root.is-hidden #ytt-panel {
+  display: none;
+}
+
+#ytt-root.no-tracks #ytt-panel,
+#ytt-root.no-tracks #ytt-fab {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ 顶栏 */
+
+#ytt-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ytt-line);
+  background: rgba(128, 128, 128, 0.07);
+  cursor: grab;
+  touch-action: none;
+  flex: 0 0 auto;
+}
+
+#ytt-head:active {
+  cursor: grabbing;
+}
+
+#ytt-title {
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+.ytt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ytt-hlbar);
+  flex: 0 0 auto;
+}
+
+#ytt-lang {
+  flex: 1 1 80px;
+  min-width: 60px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--ytt-fg);
+  background: var(--ytt-btn);
+  border: 1px solid var(--ytt-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ 按钮 */
+
+#ytt-root .ytt-btn {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.4;
+  color: var(--ytt-fg);
+  background: var(--ytt-btn);
+  border: 1px solid var(--ytt-line);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#ytt-root .ytt-btn:hover {
+  filter: brightness(1.08);
+}
+
+#ytt-root .ytt-btn.ytt-on {
+  color: #fff;
+  background: var(--ytt-hlbar);
+  border-color: var(--ytt-hlbar);
+}
+
+#ytt-root .ytt-icon {
+  padding: 3px 7px;
+}
+
+/* ------------------------------------------------------------------ 列表 */
+
+#ytt-list {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0; /* 不加的话列方向 flex 子项不肯收缩，会挤掉底部状态栏 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 10px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* 底部留白，保证最后几条也能滚动到中线。
+   注意不能用 padding-bottom：box-sizing: border-box 下 padding 会撑高
+   元素的最小高度，flex 就再也收缩不了，会把状态栏挤出面板。 */
+#ytt-list::after {
+  content: '';
+  display: block;
+  height: 45%;
+}
+
+#ytt-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+#ytt-list::-webkit-scrollbar-thumb {
+  background: var(--ytt-line);
+  border-radius: 4px;
+}
+
+.ytt-cue {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  margin: 2px 0;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.ytt-cue:hover {
+  background: rgba(128, 128, 128, 0.14);
+}
+
+/* 关闭「点击跳转」时，光标按普通文本处理，暗示可以随意划词 */
+#ytt-root.no-jump .ytt-cue {
+  cursor: text;
+}
+
+.ytt-cue.is-active {
+  background: var(--ytt-hl);
+  border-left-color: var(--ytt-hlbar);
+}
+
+.ytt-cue .ytt-time {
+  flex: 0 0 auto;
+  min-width: 40px;
+  padding-top: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ytt-dim);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ytt-cue .ytt-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 关掉时间戳 */
+#ytt-root.no-time .ytt-cue .ytt-time {
+  display: none;
+}
+
+/* 文本块比单行字幕长，行距松一点更好读 */
+#ytt-root .ytt-cue {
+  line-height: 1.6;
+}
+
+.ytt-cue.is-active .ytt-text {
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------ 底栏 / 缩放 */
+
+#ytt-status {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--ytt-dim);
+  border-top: 1px solid var(--ytt-line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#ytt-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0.55;
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--ytt-dim) 50% 58%,
+    transparent 58% 70%,
+    var(--ytt-dim) 70% 78%,
+    transparent 78%
+  );
+}
+
+/* ------------------------------------------------------------------ 悬浮按钮 */
+
+#ytt-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 96px;
+  z-index: 2147483000;
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ytt-fg);
+  background: var(--ytt-bg);
+  border: 1px solid var(--ytt-line);
+  border-radius: 50%;
+  box-shadow: var(--ytt-shadow);
+  cursor: pointer;
+}
+
+#ytt-fab:hover {
+  filter: brightness(1.08);
+}
+
+#ytt-root.is-hidden #ytt-fab {
+  display: block;
+}
+
+/* ================================================================== 嵌入模式 */
+/* 面板直接作为右侧栏（#secondary-inner）的子元素，融入页面布局 */
+
+#ytt-root.is-embed #ytt-panel {
+  position: static;
+  left: auto;
+  top: auto;
+  width: 100%;
+  max-width: none;
+  margin: 0 0 12px;
+  background: var(--ytt-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+#ytt-root.is-embed #ytt-head {
+  cursor: default;
+}
+
+#ytt-root.is-embed #ytt-title {
+  display: none;
+}
+
+/* 嵌入模式下高度对齐播放器，不需要手动调大小 */
+#ytt-root.is-embed #ytt-grip {
+  display: none;
+}
+
+/* 嵌入模式下隐藏时的重新入口是扩展图标，不需要悬浮按钮 */
+#ytt-root.is-embed #ytt-fab {
+  display: none !important;
+}
