@@ -103,3 +103,7 @@ node tools/test-hook/server.js &      # 起本地假 YouTube
 
 `tools/test-hook/server.js` 用假播放器模拟 YouTube，`run-e2e.sh` 把 `inject.js` + `content.js` 当普通页面脚本加载（stub 掉 `chrome.*`）后截图/导出 DOM。
 注意：Chrome 155 已禁用 `--load-extension`，所以没法在 headless 里直接加载扩展本体，只能这样测。
+
+## License
+
+[MIT](LICENSE) —— 随便用，包括商用、修改、再分发，保留版权声明即可。
