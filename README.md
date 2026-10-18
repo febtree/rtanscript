@@ -1,5 +1,8 @@
 # YouTube 实时字幕跟随
 
+> 名字的来历：**rt** = realtime，**anscript** 取自 transcript —— 实时 + transcript = **rtanscript**。
+> 不是拼写错误 🙂
+
 一个 Chrome 扩展（Manifest V3）：把 YouTube 字幕做成一栏**可滚动的文稿**，实时高亮并平滑跟随当前播放位置；字幕可以自由**划选复制**（方便取词翻译），点击某一行可跳转到对应时间。
 
 ## 功能
