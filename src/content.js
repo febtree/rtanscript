@@ -167,7 +167,7 @@
     jumpBtn.type = 'button';
     jumpBtn.textContent = '跳转';
 
-    head.append(langSel, searchBtn, followBtn, jumpBtn, timeBtn, modeBtn, hideBtn);
+    head.append(langSel, timeBtn, searchBtn, followBtn, jumpBtn, modeBtn, hideBtn);
 
     // 搜索栏单独一行，避免把可拖拽的顶栏挤得太满
     searchBar = h('div');
