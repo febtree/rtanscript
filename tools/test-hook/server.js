@@ -38,6 +38,14 @@ const NOPUNCT_JSON3 = (() => {
   return { events };
 })();
 
+/** Unicode 大小写：İ 转小写后长度会从 1 变成 2，用来验证搜索下标仍落在原文上 */
+const UNICODE_JSON3 = {
+  events: [
+    { tStartMs: 0, dDurationMs: 2000, segs: [{ utf8: 'İSTANBUL' }] },
+    { tStartMs: 2000, dDurationMs: 2000, segs: [{ utf8: ' is a city.' }] },
+  ],
+};
+
 /** 长字幕：48 条 × 2.5s = 120s，每 3 条凑一个完整句子（用于验证分块） */
 const LONG_JSON3 = (() => {
   const frag = [
@@ -118,7 +126,18 @@ const EXPORT_SNIPPET = `
         if (params.has('esc')) {
           setTimeout(() => {
             inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            // ?nokeyup=1：只发 keydown，用来验证「被 blur 掉」时失焦兜底也能关闭
+            if (!params.has('nokeyup')) {
+              inp.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }));
+            }
           }, 200);
+        }
+        // ?outside=1：模拟用户点到搜索栏外面导致失焦，此时不应关闭搜索
+        if (params.has('outside')) {
+          setTimeout(() => {
+            document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+            if (inp.blur) inp.blur();
+          }, 400);
         }
       }
     }, 3000);
@@ -235,7 +254,7 @@ const EXPORT_SNIPPET = `
  * 测试外壳：把 inject.js / content.js 当普通页面脚本加载，stub 掉 chrome.* API。
  * （headless Chrome 155 禁用了 --load-extension，所以没法直接加载扩展本体）
  */
-const harness = ({ needsPot = false, forceXml = false, ytLayout = false, dark = false, long = false, nopunct = false } = {}) => {
+const harness = ({ needsPot = false, forceXml = false, ytLayout = false, dark = false, long = false, nopunct = false, unicode = false, blockEsc = false } = {}) => {
   const body = ytLayout
     ? `<div id="columns">
     <div id="primary"><div id="primary-inner">
@@ -282,7 +301,7 @@ ${body}
     languageCode: 'en', kind: 'asr', vssId: 'a.en',
     name: { simpleText: 'English (auto-generated)' },
     baseUrl: location.origin + '/api/timedtext?v=TESTID&lang=en&caps=asr'
-      + '${needsPot ? '&exp=xpe' : ''}${forceXml ? '&nojson=1' : ''}${long ? '&long=1' : ''}${nopunct ? '&nopunct=1' : ''}',
+      + '${needsPot ? '&exp=xpe' : ''}${forceXml ? '&nojson=1' : ''}${long ? '&long=1' : ''}${nopunct ? '&nopunct=1' : ''}${unicode ? '&unicode=1' : ''}',
   };
   var player = document.getElementById('movie_player');
 
@@ -316,6 +335,15 @@ ${body}
     }
   };
 </script>
+${blockEsc ? `<script>
+  // 模拟 Vimium / YouTube 这类更早注册的全局 Esc 拦截：blur 焦点并阻止继续传播
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const el = document.activeElement;
+    if (el && el.blur) el.blur();
+    e.stopImmediatePropagation();
+  }, true);
+</script>` : ''}
 <script src="/src/inject.js"></script>
 <script src="/src/content.js"></script>
 <script>${EXPORT_SNIPPET}</script>
@@ -331,7 +359,9 @@ const server = http.createServer((req, res) => {
       ? NOPUNCT_JSON3
       : url.searchParams.get('long')
         ? LONG_JSON3
-        : JSON3;
+        : url.searchParams.get('unicode')
+          ? UNICODE_JSON3
+          : JSON3;
     // nojson=1：模拟 json3 拿不到、只能回退 XML
     if (url.searchParams.get('fmt') === 'json3' && !url.searchParams.get('nojson')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -354,9 +384,11 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/harness/direct') return html(harness());
   if (url.pathname === '/harness/xml') return html(harness({ forceXml: true }));
   if (url.pathname === '/harness/pot') return html(harness({ needsPot: true }));
+  if (url.pathname === '/harness/blockesc') return html(harness({ blockEsc: true }));
   if (url.pathname === '/harness/embed') return html(harness({ needsPot: true, ytLayout: true, dark: true }));
   if (url.pathname === '/harness/blocks') return html(harness({ needsPot: true, ytLayout: true, dark: true, long: true }));
   if (url.pathname === '/harness/nopunct') return html(harness({ needsPot: true, ytLayout: true, dark: true, nopunct: true }));
+  if (url.pathname === '/harness/unicode') return html(harness({ unicode: true }));
   if (url.pathname === '/e2e/direct') return html(page(false));
   if (url.pathname === '/e2e/pot') return html(page(true));
   if (url.pathname === '/' || url.pathname === '/watch') return html(page(false));

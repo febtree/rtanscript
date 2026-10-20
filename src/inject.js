@@ -4,6 +4,7 @@
  * 只有运行在页面世界才能：
  *   1. 拿到 player 对象上的 getPlayerResponse() / getOption() / setOption()
  *   2. hook 页面自己的 fetch / XHR，截获播放器发出的 timedtext 请求
+ *   3. 抢在页面脚本之前处理搜索栏的 Esc（页面会 blur 输入框并吞掉事件）
  *
  * 关于第 2 点：2025 年起，baseUrl 带 `exp=xpe` 的视频，timedtext 接口必须带
  * PO Token（`pot=`）才返回内容，否则是 HTTP 200 + 空 body。pot 由播放器内部的
@@ -15,6 +16,56 @@
 
   const TAG = 'ytt-follow';
   let lastSig = '';
+
+  // ============================================================ 搜索栏 Esc
+  // YouTube / 键盘插件会在捕获阶段处理 Escape，常常先把输入框 blur 掉再阻止事件
+  // 继续传播，导致搜索框自己的 keydown 收不到。这个脚本在 document_start 运行，
+  // 注册得比页面脚本早，所以能抢到事件。
+  //
+  // 只保留两条路径：
+  //   1. keydown：正常情况，焦点在搜索栏里时直接拦下
+  //   2. focusout：Esc 被页面 / 插件抢先处理、输入框只被 blur 时兜底
+  let searchBlurByPointer = false;
+
+  const inSearchBar = (el) => {
+    const bar = document.getElementById('ytt-search');
+    return !!(bar && el && bar.contains(el));
+  };
+  const searchIsOpen = () => {
+    const rootEl = document.getElementById('ytt-root');
+    return !!(rootEl && rootEl.classList.contains('search-open'));
+  };
+  const closeSearch = () => {
+    // 关闭后可能还会收到自身 blur 触发的 focusout，先把标记清掉
+    searchBlurByPointer = false;
+    window.postMessage({ source: TAG, type: 'close-search' }, '*');
+  };
+
+  // 点击到搜索栏外面也会让输入框失焦，但这不代表用户想退出搜索
+  document.addEventListener('pointerdown', (e) => {
+    searchBlurByPointer = !inSearchBar(e.target);
+  }, true);
+
+  // 焦点进入搜索栏时清掉上一次点击留下的标记（比如刚点了 🔍 按钮打开搜索）
+  document.addEventListener('focusin', (e) => {
+    if (inSearchBar(e.target)) searchBlurByPointer = false;
+  }, true);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.isComposing) return;
+    if (!searchIsOpen() || !inSearchBar(document.activeElement)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    closeSearch();
+  }, true);
+
+  document.addEventListener('focusout', (e) => {
+    if (!searchIsOpen() || !inSearchBar(e.target)) return;
+    if (e.relatedTarget && inSearchBar(e.relatedTarget)) return; // 焦点还在搜索栏里
+    if (searchBlurByPointer) { searchBlurByPointer = false; return; }
+    if (e.relatedTarget) return; // Tab 到别的控件，不当作退出搜索
+    closeSearch(); // 无 relatedTarget 的失焦：通常是 Esc / 页面脚本主动 blur
+  }, true);
 
   // ============================================================ 播放器信息
 

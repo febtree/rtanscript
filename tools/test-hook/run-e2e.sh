@@ -30,8 +30,12 @@ run /harness/blocks   # 长字幕：验证 10~20 秒分块
 run /harness/nopunct  # 无标点字幕：验证「挑最大停顿」的回退逻辑
 run /harness/pot?clickseek=1   # 开启「点击跳转」后点字幕应当 seek
 run '/harness/direct?search=the'          # 字幕搜索：2 处命中，高亮并定位第 1 处
+run '/harness/unicode?search=stanbul'     # Unicode 大小写：İ 转小写会变长，命中下标必须仍对应原文
 run '/harness/direct?search=the&next=1'   # 字幕搜索：Enter 跳到第 2 处
 run '/harness/direct?search=the&esc=1'    # 字幕搜索：输入框聚焦时 Esc 关闭搜索栏
+run '/harness/blockesc?search=the&esc=1'  # 模拟 Vimium/YouTube 抢走 keydown，靠 keyup 兜底关闭
+run '/harness/blockesc?search=the&esc=1&nokeyup=1'  # 只有 keydown 且被 blur：靠失焦兜底关闭
+run '/harness/direct?search=the&outside=1'         # 点击搜索栏外面失焦：不应关闭搜索
 
 # ---------------------------------------------------------------- 悬停 / 划词暂停跟随
 # 模拟视频播放（2.5 倍速），对比「不暂停 / 悬停 / 划词」三种情况下列表的滚动时机。

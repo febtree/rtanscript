@@ -66,6 +66,7 @@ inject.js (MAIN)                       content.js (ISOLATED)
 - 只匹配 `www.youtube.com`（不含 `m.youtube.com`、`music.youtube.com`、嵌入播放器）。
 - 路径 2 会**短暂打开一次播放器的 CC 字幕**（约 2.5 秒）来触发请求，拿到数据后会还原成你原本的设置。如果你本来就开着 CC，则不会有任何变化。
 - 如果你的视频本来就没有任何字幕轨道，面板不会显示。
+- 如果装了 Vimium 等键盘插件，`Esc` 有可能被插件完全吞掉。扩展已经用失焦兜底尽量兼容；若仍无效，可把 YouTube 加进该插件的排除列表，或直接点搜索栏的 `✕`。
 - 嵌入模式下高度固定对齐播放窗口，不能手动拖高（右下角的缩放手柄只在浮窗模式可用）；隐藏后重新显示要点扩展工具栏图标（浮窗模式则是右下角的 `CC` 按钮）。
 
 ## 目录结构
@@ -99,6 +100,9 @@ node tools/test-hook/server.js &      # 起本地假 YouTube
 - `/harness/nopunct` —— 40 条 × 2.5s 的**无标点**字幕（模拟中文 ASR，停顿有大小之分），校验第 3 条回退逻辑（预期边界全部落在 1.5s 的大停顿上）
 - `/harness/pot?clickseek=1` —— 校验「点击跳转」开关：默认点击**不应**写入 `video.currentTime`，开启后应写入一次
 - `/harness/direct?search=the[&next=1|&esc=1]` —— 校验字幕搜索：输入关键词后应高亮 2 处 `the`、定位第 1 处；带 `next=1` 时按一次 Enter 跳到第 2 处；带 `esc=1` 时按 Esc 应关闭搜索栏并保留关键词
+- `/harness/blockesc?search=the&esc=1[&nokeyup=1]` —— 模拟 Vimium 等插件抢走 keydown/keyup，校验「输入框只被 blur」时靠失焦兜底关闭
+- `/harness/direct?search=the&outside=1` —— 校验点击搜索栏外造成的失焦不会误关搜索
+- `/harness/unicode?search=stanbul` —— Unicode 大小写：`İSTANBUL` 转小写后会变长，校验命中下标仍对应原文
 - `/harness/blocks?sim=1[&sel=1|&nopause=1]` —— 模拟视频播放，对比「不暂停 / 悬停 / 划词」时列表的滚动时机，校验暂停跟随
 
 > 注意：headless 的虚拟时间下 `requestAnimationFrame` 不会触发，所以测试外壳里用 `setTimeout` 顶替了 `requestAnimationFrame`，否则主循环压根不跑，测出来的结论都是假的。

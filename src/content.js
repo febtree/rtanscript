@@ -175,7 +175,10 @@
 
     searchInput = h('input');
     searchInput.id = 'ytt-search-input';
-    searchInput.type = 'search';
+    // 用 text 而不是 search：原生 search 输入框在 Esc 时会把内容清空，
+    // 万一 keydown 被别的扩展先拦走，我们想保留关键词也留不住
+    searchInput.type = 'text';
+    searchInput.inputMode = 'search';
     searchInput.placeholder = '搜索字幕…';
     searchInput.autocomplete = 'off';
     searchInput.spellcheck = false;
@@ -359,32 +362,29 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       moveSearch(e.shiftKey ? -1 : 1);
-      return;
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setSearchOpen(false);
     }
   }
+
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   /** 重新计算命中位置，并重绘所有文本块里的高亮 */
   function applySearch(scrollToFirst) {
     if (!searchInput) return;
 
     state.search = searchInput.value.trim();
-    const query = state.search.toLowerCase();
     state.searchHits = [];
     state.searchIndex = -1;
 
-    if (query) {
+    if (state.search) {
+      // 直接在原文上做不区分大小写的匹配：正则给出的下标天然对应原文。
+      // 不能先 toLowerCase() 再 indexOf —— 有些字符转小写后长度会变（如 İ），
+      // 用转换后的下标去切原文就会错位。
+      const re = new RegExp(escapeRegExp(state.search), 'gi');
       state.cues.forEach((c, cueIndex) => {
-        const lower = c.text.toLowerCase();
-        let from = 0;
-        for (;;) {
-          const at = lower.indexOf(query, from);
-          if (at < 0) break;
-          state.searchHits.push({ cue: cueIndex, start: at, end: at + query.length });
-          from = at + query.length;
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(c.text))) {
+          state.searchHits.push({ cue: cueIndex, start: m.index, end: m.index + m[0].length });
         }
       });
     }
@@ -402,7 +402,7 @@
 
   /** 按当前关键词重建每个 .ytt-text 的内容（命中处用 <mark> 包起来） */
   function paintSearchText() {
-    const query = state.search.toLowerCase();
+    const query = state.search;
     const byCue = new Map();
     if (query) {
       state.searchHits.forEach((hit, index) => {
