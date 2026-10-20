@@ -101,6 +101,29 @@ const EXPORT_SNIPPET = `
     setTimeout(() => { const b = $('ytt-time'); if (b) b.click(); }, 3000);
   }
 
+  // ?search=关键词 自动展开搜索并输入；?next=1 再按一次 Enter 跳到下一处
+  if (params.has('search')) {
+    setTimeout(() => {
+      const b = $('ytt-search-btn');
+      if (b) b.click();
+      const inp = $('ytt-search-input');
+      if (inp) {
+        inp.value = params.get('search');
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        if (params.has('next')) {
+          setTimeout(() => {
+            inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+          }, 200);
+        }
+        if (params.has('esc')) {
+          setTimeout(() => {
+            inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          }, 200);
+        }
+      }
+    }, 3000);
+  }
+
   // ?sim=1 模拟「视频在播放」并悬停在面板上，验证悬停/划词会暂停跟随
   if (params.has('sim')) {
     const panelEl = $('ytt-panel');
@@ -161,11 +184,24 @@ const EXPORT_SNIPPET = `
     const status = $('ytt-status');
     const panel = $('ytt-panel');
     const rootEl = $('ytt-root');
+    const searchInput = $('ytt-search-input');
+    const searchCount = $('ytt-search-count');
+    const marks = list ? [...list.querySelectorAll('.ytt-text mark')] : [];
+    const currentMark = list ? list.querySelector('.ytt-text mark.is-current') : null;
     const rect = (el) => (el ? { top: Math.round(el.getBoundingClientRect().top), bottom: Math.round(el.getBoundingClientRect().bottom), height: Math.round(el.getBoundingClientRect().height), display: getComputedStyle(el).display } : null);
     return {
       messages: window.__seen,
       status: status ? status.textContent : null,
       cues: list ? [...list.querySelectorAll('.ytt-cue')].map((n) => n.querySelector('.ytt-time').textContent + ' | ' + n.querySelector('.ytt-text').textContent) : null,
+      search: {
+        open: rootEl.classList.contains('search-open'),
+        value: searchInput ? searchInput.value : null,
+        count: searchCount ? searchCount.textContent : null,
+        marks: marks.map((m) => m.textContent),
+        hits: marks.length,
+        current: currentMark ? currentMark.textContent : null,
+        currentCue: currentMark ? Number(currentMark.closest('.ytt-cue').dataset.i) : null,
+      },
       geometry: {
         viewport: { w: innerWidth, h: innerHeight },
         rootParent: rootEl.parentElement.id || rootEl.parentElement.tagName,

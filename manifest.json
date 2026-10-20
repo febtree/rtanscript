@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "YouTube 实时字幕跟随",
-  "version": "1.0.0",
-  "description": "在可滚动的浮动面板中实时高亮并跟随当前 YouTube 字幕，支持划词、点击跳转与面板拖拽缩放。",
+  "version": "1.1.0",
+  "description": "在可滚动的面板中实时高亮并跟随当前 YouTube 字幕，支持字幕搜索、划词、点击跳转与面板拖拽缩放。",
   "minimum_chrome_version": "111",
   "permissions": ["storage"],
   "host_permissions": ["https://www.youtube.com/*"],

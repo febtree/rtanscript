@@ -149,6 +149,60 @@ html[dark] #ytt-root {
   padding: 3px 7px;
 }
 
+#ytt-root .ytt-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
+}
+
+/* ------------------------------------------------------------------ 搜索 */
+
+#ytt-search {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ytt-line);
+  background: rgba(128, 128, 128, 0.04);
+}
+
+#ytt-root.search-open #ytt-search {
+  display: flex;
+}
+
+#ytt-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ytt-fg);
+  background: var(--ytt-btn);
+  border: 1px solid var(--ytt-line);
+  border-radius: 6px;
+  outline: none;
+}
+
+#ytt-search-input:focus {
+  border-color: var(--ytt-hlbar);
+}
+
+#ytt-search-input::placeholder {
+  color: var(--ytt-dim);
+}
+
+#ytt-search .ytt-count {
+  flex: 0 0 auto;
+  min-width: 34px;
+  font-size: 11px;
+  color: var(--ytt-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
 /* ------------------------------------------------------------------ 列表 */
 
 #ytt-list {
@@ -221,6 +275,30 @@ html[dark] #ytt-root {
   min-width: 0;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* 搜索命中：全部用黄色底标出，当前这一处颜色更实 */
+.ytt-cue .ytt-text mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  color: inherit;
+  background: rgba(255, 208, 0, 0.42);
+}
+
+.ytt-cue .ytt-text mark.is-current {
+  color: #1a1a1a;
+  background: #ffc400;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22);
+}
+
+html[dark] .ytt-cue .ytt-text mark {
+  background: rgba(255, 213, 0, 0.34);
+}
+
+html[dark] .ytt-cue .ytt-text mark.is-current {
+  color: #111111;
+  background: #ffd54f;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
 }
 
 /* 关掉时间戳 */

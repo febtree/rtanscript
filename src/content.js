@@ -39,6 +39,11 @@
     visible: true,
     showTime: true,            // 是否显示时间戳
     clickSeek: false,          // 点击字幕是否跳转视频（默认关闭，避免误触）
+    search: '',                // 当前搜索关键词
+    searchOpen: false,         // 搜索栏是否展开
+    searchHits: [],            // 命中位置 [{ cue, start, end }]
+    searchIndex: -1,           // 当前命中序号
+    composing: false,          // 输入法是否正在组词
     hasTracks: false,
     video: null,
     reqId: 0,
@@ -112,7 +117,9 @@
 
   // ---------------------------------------------------------------- DOM
 
-  let root, panel, head, langSel, followBtn, hideBtn, modeBtn, timeBtn, jumpBtn, list, statusEl, grip, fab;
+  let root, panel, head, langSel, searchBtn, searchBar, searchInput, searchCount,
+    searchPrev, searchNext, searchClose, followBtn, hideBtn, modeBtn, timeBtn,
+    jumpBtn, list, statusEl, grip, fab;
 
   function buildUI() {
     root = h('div');
@@ -131,6 +138,11 @@
     langSel = h('select');
     langSel.id = 'ytt-lang';
     langSel.title = '选择字幕语言';
+
+    searchBtn = h('button', 'ytt-btn ytt-icon');
+    searchBtn.id = 'ytt-search-btn';
+    searchBtn.type = 'button';
+    searchBtn.textContent = '🔍';
 
     followBtn = h('button', 'ytt-btn');
     followBtn.id = 'ytt-follow';
@@ -155,7 +167,42 @@
     jumpBtn.type = 'button';
     jumpBtn.textContent = '跳转';
 
-    head.append(langSel, followBtn, jumpBtn, timeBtn, modeBtn, hideBtn);
+    head.append(langSel, searchBtn, followBtn, jumpBtn, timeBtn, modeBtn, hideBtn);
+
+    // 搜索栏单独一行，避免把可拖拽的顶栏挤得太满
+    searchBar = h('div');
+    searchBar.id = 'ytt-search';
+
+    searchInput = h('input');
+    searchInput.id = 'ytt-search-input';
+    searchInput.type = 'search';
+    searchInput.placeholder = '搜索字幕…';
+    searchInput.autocomplete = 'off';
+    searchInput.spellcheck = false;
+    searchInput.setAttribute('aria-label', '搜索字幕');
+
+    searchCount = h('span', 'ytt-count');
+    searchCount.id = 'ytt-search-count';
+
+    searchPrev = h('button', 'ytt-btn ytt-icon');
+    searchPrev.id = 'ytt-search-prev';
+    searchPrev.type = 'button';
+    searchPrev.textContent = '↑';
+    searchPrev.title = '上一个匹配（Shift+Enter）';
+
+    searchNext = h('button', 'ytt-btn ytt-icon');
+    searchNext.id = 'ytt-search-next';
+    searchNext.type = 'button';
+    searchNext.textContent = '↓';
+    searchNext.title = '下一个匹配（Enter）';
+
+    searchClose = h('button', 'ytt-btn ytt-icon');
+    searchClose.id = 'ytt-search-close';
+    searchClose.type = 'button';
+    searchClose.textContent = '✕';
+    searchClose.title = '关闭搜索';
+
+    searchBar.append(searchInput, searchCount, searchPrev, searchNext, searchClose);
 
     list = h('div');
     list.id = 'ytt-list';
@@ -167,7 +214,7 @@
     grip.id = 'ytt-grip';
     grip.title = '拖动右下角调整大小';
 
-    panel.append(head, list, statusEl, grip);
+    panel.append(head, searchBar, list, statusEl, grip);
 
     fab = h('button');
     fab.id = 'ytt-fab';
@@ -206,6 +253,21 @@
       loadCaptions(state.userCode);
     });
 
+    searchBtn.addEventListener('click', () => setSearchOpen(!state.searchOpen));
+    searchClose.addEventListener('click', () => setSearchOpen(false));
+    searchPrev.addEventListener('click', () => moveSearch(-1));
+    searchNext.addEventListener('click', () => moveSearch(1));
+    searchInput.addEventListener('input', (e) => {
+      if (state.composing || e.isComposing) return; // 中文输入法组词中先不跳
+      applySearch(true);
+    });
+    searchInput.addEventListener('compositionstart', () => { state.composing = true; });
+    searchInput.addEventListener('compositionend', () => {
+      state.composing = false;
+      applySearch(true);
+    });
+    searchInput.addEventListener('keydown', onSearchKeyDown);
+
     // 划词保护：mousedown 时若已有选区，则这一次点击不当作跳转
     list.addEventListener('mousedown', () => {
       const sel = window.getSelection();
@@ -229,6 +291,8 @@
 
     syncFollowBtn();
     syncModeBtn();
+    syncSearchBtn();
+    updateSearchCount();
     applyShowTime();
     applyClickSeek();
     refreshMount();
@@ -251,6 +315,161 @@
       timeBtn.classList.toggle('ytt-on', state.showTime);
       timeBtn.title = state.showTime ? '隐藏时间戳' : '显示时间戳';
     }
+  }
+
+  // ---------------------------------------------------------------- 字幕搜索
+
+  function setSearchOpen(open) {
+    state.searchOpen = !!open;
+    root.classList.toggle('search-open', state.searchOpen);
+    syncSearchBtn();
+
+    if (state.searchOpen) {
+      searchInput.focus();
+      searchInput.select();
+      // 关键词会保留，重新打开时继续按上次的词搜索
+      if (searchInput.value.trim()) applySearch(true);
+      return;
+    }
+
+    // 关闭只退出搜索状态，不清空输入框里的关键词；然后回到当前播放位置
+    state.composing = false;
+    clearAppliedSearch();
+    searchInput.blur();
+    if (state.cues.length) state.needJump = true;
+  }
+
+  /** 退出搜索状态：保留输入框内容，只清除高亮和命中，恢复自动跟随 */
+  function clearAppliedSearch() {
+    state.search = '';
+    state.searchHits = [];
+    state.searchIndex = -1;
+    paintSearchText();
+    updateSearchCount();
+    syncSearchBtn();
+  }
+
+  function syncSearchBtn() {
+    if (!searchBtn) return;
+    searchBtn.classList.toggle('ytt-on', state.searchOpen || !!state.search);
+    searchBtn.title = state.searchOpen ? '关闭字幕搜索' : '搜索字幕';
+  }
+
+  function onSearchKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      moveSearch(e.shiftKey ? -1 : 1);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setSearchOpen(false);
+    }
+  }
+
+  /** 重新计算命中位置，并重绘所有文本块里的高亮 */
+  function applySearch(scrollToFirst) {
+    if (!searchInput) return;
+
+    state.search = searchInput.value.trim();
+    const query = state.search.toLowerCase();
+    state.searchHits = [];
+    state.searchIndex = -1;
+
+    if (query) {
+      state.cues.forEach((c, cueIndex) => {
+        const lower = c.text.toLowerCase();
+        let from = 0;
+        for (;;) {
+          const at = lower.indexOf(query, from);
+          if (at < 0) break;
+          state.searchHits.push({ cue: cueIndex, start: at, end: at + query.length });
+          from = at + query.length;
+        }
+      });
+    }
+
+    paintSearchText();
+
+    if (state.searchHits.length) {
+      state.searchIndex = 0;
+      paintCurrentHit();
+      if (scrollToFirst) centerOn(state.searchHits[0].cue);
+    }
+    updateSearchCount();
+    syncSearchBtn();
+  }
+
+  /** 按当前关键词重建每个 .ytt-text 的内容（命中处用 <mark> 包起来） */
+  function paintSearchText() {
+    const query = state.search.toLowerCase();
+    const byCue = new Map();
+    if (query) {
+      state.searchHits.forEach((hit, index) => {
+        if (!byCue.has(hit.cue)) byCue.set(hit.cue, []);
+        byCue.get(hit.cue).push(Object.assign({ index }, hit));
+      });
+    }
+
+    state.cues.forEach((c, cueIndex) => {
+      const node = state.nodes[cueIndex];
+      const span = node && node.querySelector('.ytt-text');
+      if (!span) return;
+
+      const hits = byCue.get(cueIndex);
+      if (!query || !hits) {
+        span.textContent = c.text;
+        return;
+      }
+
+      span.textContent = '';
+      let from = 0;
+      for (const hit of hits) {
+        if (hit.start > from) span.appendChild(document.createTextNode(c.text.slice(from, hit.start)));
+        const mark = document.createElement('mark');
+        mark.className = 'ytt-mark';
+        mark.dataset.hit = String(hit.index);
+        mark.textContent = c.text.slice(hit.start, hit.end);
+        if (hit.index === state.searchIndex) mark.classList.add('is-current');
+        span.appendChild(mark);
+        from = hit.end;
+      }
+      if (from < c.text.length) span.appendChild(document.createTextNode(c.text.slice(from)));
+    });
+  }
+
+  function paintCurrentHit() {
+    list.querySelectorAll('mark[data-hit]').forEach((mark) => {
+      mark.classList.toggle('is-current', Number(mark.dataset.hit) === state.searchIndex);
+    });
+  }
+
+  function moveSearch(dir) {
+    const n = state.searchHits.length;
+    if (!n) return;
+    state.searchIndex = (state.searchIndex + dir + n) % n;
+    paintCurrentHit();
+    updateSearchCount();
+    // 搜索期间不自动跟随，这里负责把当前命中滚到视野中间
+    centerOn(state.searchHits[state.searchIndex].cue);
+  }
+
+  function updateSearchCount() {
+    if (!searchCount) return;
+    const n = state.searchHits.length;
+    if (!state.search) {
+      searchCount.textContent = '';
+      searchCount.title = '';
+    } else if (!n) {
+      searchCount.textContent = '无匹配';
+      searchCount.title = '没有找到匹配的字幕';
+    } else {
+      searchCount.textContent = `${state.searchIndex + 1}/${n}`;
+      searchCount.title = `共 ${n} 处匹配，Enter 下一个，Shift+Enter 上一个`;
+    }
+    const empty = !n;
+    if (searchPrev) searchPrev.disabled = empty;
+    if (searchNext) searchNext.disabled = empty;
   }
 
   // ------------------------------------------------- 挂载方式：嵌入页面 / 浮动窗口
@@ -476,6 +695,7 @@
   /** 实际是否在自动滚动：意图 + 没被“正在阅读”打断 */
   function isFollowing() {
     if (!intentFollowing()) return false;
+    if (state.search) return false;         // 正在搜索：让用户停在命中位置
     if (state.hover) return false;          // 鼠标停在面板上
     if (hasPanelSelection()) return false;  // 正在划词
     return true;
@@ -516,6 +736,7 @@
     if (!m || m.source !== TAG) return;
     if (m.type === 'tracks') onTracks(m.payload);
     else if (m.type === 'caption-data') onCaptionData(m.payload);
+    else if (m.type === 'close-search') setSearchOpen(false);
   });
 
   // ---------------------------------------------------------------- 轨道处理
@@ -582,7 +803,10 @@
     state.cues = [];
     state.nodes = [];
     state.activeIndex = -1;
+    state.searchHits = [];
+    state.searchIndex = -1;
     list.textContent = '';
+    updateSearchCount();
   }
 
   function setStatus(text) {
@@ -917,6 +1141,9 @@
     // 列表原本是空的（首次加载 / 换语言）→ 至少落位一次；只是增量补数据就不动，
     // 免得把正在回头精读的用户拽走
     if (wasEmpty) state.needJump = true;
+
+    // 重新渲染后保留搜索高亮（增量补字幕、切换语言时都适用）
+    if (state.search) applySearch(false);
   }
 
   function setActive(idx, force) {
@@ -1008,7 +1235,8 @@
     if (!state.visible || !list.clientHeight) return;
 
     // 首次渲染后先落位一次（此时可能因为鼠标悬停而不处于跟随状态）
-    if (state.needJump && state.nodes[state.activeIndex]) {
+    // 搜索期间不要抢走用户正在查看的命中位置
+    if (!state.search && state.needJump && state.nodes[state.activeIndex]) {
       centerOn(state.activeIndex);
       state.needJump = false;
     }
@@ -1039,6 +1267,8 @@
     state.captures = new Map();
     state.hasTracks = false;
     state.video = null;
+    // 换视频时收起搜索，避免旧关键词把新视频的自动跟随一直憋着
+    if (state.searchOpen || state.search) setSearchOpen(false);
     resetCues();
     applyVisibility();
     setStatus('等待字幕信息…');

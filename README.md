@@ -19,6 +19,7 @@
   第 3 条是给自动字幕准备的：中文 ASR 经常**完全没有标点**，单句又可能超过 20 秒，这时如果硬切在第 20 秒那个 cue 上，就会看起来像从句子中间随机断开；挑最大的停顿切，观感自然得多。
   中英文混排时中文之间不会插入多余空格。粒度想调就改 `src/content.js` 里的 `BLOCK_MIN` / `BLOCK_MAX` / `PAUSE_BREAK`。
 - **时间戳可开关**：顶栏的 `⏱` 按钮一键隐藏/显示每段前面的时间戳，纯读文本时更清爽。状态会被记住。
+- **字幕搜索**：顶栏的 `🔍` 展开搜索栏，输入即高亮全部命中并跳到第一处；`Enter` / `Shift+Enter`（或 `↑` / `↓`）在命中之间跳转；输入框有焦点时按 `Esc` 直接关闭搜索栏，关键词会保留，重新打开可继续搜索。搜索期间自动跟随会让路，关闭后立刻回到当前播放位置；中文输入法组词过程中不会来回跳。
 - **实时高亮 + 自动跟随**：基于 `requestAnimationFrame` 每帧定位当前段落，滚动带缓动，连续跟手。
 - **手动滚动暂停**：手动滚动（滚轮 / 触摸 / 方向键）时暂停跟随，停止 6 秒后自动恢复；顶栏的「跟随中 / 已暂停」按钮可随时切换。
 - **悬停 / 划词时暂停跟随**：鼠标停在面板上、或者面板里有文本选区时，自动滚动会让路 —— 回头精读、划词翻译、查单词时不会读到一半被拽回当前播放位置；鼠标移开或选区消失后立刻追上。
@@ -83,11 +84,11 @@ tools/test-hook/           本地端到端测试（见下）
 
 ## 测试
 
-`tools/test-hook/` 里有一个本地测试服务器和一个 headless Chrome 跑测脚本，覆盖四条链路：
+`tools/test-hook/` 里有一个本地测试服务器和一个 headless Chrome 跑测脚本，覆盖以下链路：
 
 ```sh
 node tools/test-hook/server.js &      # 起本地假 YouTube
-./tools/test-hook/run-e2e.sh          # 跑 /harness/{direct,xml,pot,embed,blocks}
+./tools/test-hook/run-e2e.sh          # 跑 /harness/{direct,xml,pot,embed,blocks,search}
 ```
 
 - `/harness/direct` —— 直连 `timedtext`（json3）
@@ -97,6 +98,7 @@ node tools/test-hook/server.js &      # 起本地假 YouTube
 - `/harness/blocks` —— 48 条 × 2.5s 的长字幕（每 3 条一个整句），校验分块结果（预期 8 段，每段 15s，全部断在句末）
 - `/harness/nopunct` —— 40 条 × 2.5s 的**无标点**字幕（模拟中文 ASR，停顿有大小之分），校验第 3 条回退逻辑（预期边界全部落在 1.5s 的大停顿上）
 - `/harness/pot?clickseek=1` —— 校验「点击跳转」开关：默认点击**不应**写入 `video.currentTime`，开启后应写入一次
+- `/harness/direct?search=the[&next=1|&esc=1]` —— 校验字幕搜索：输入关键词后应高亮 2 处 `the`、定位第 1 处；带 `next=1` 时按一次 Enter 跳到第 2 处；带 `esc=1` 时按 Esc 应关闭搜索栏并保留关键词
 - `/harness/blocks?sim=1[&sel=1|&nopause=1]` —— 模拟视频播放，对比「不暂停 / 悬停 / 划词」时列表的滚动时机，校验暂停跟随
 
 > 注意：headless 的虚拟时间下 `requestAnimationFrame` 不会触发，所以测试外壳里用 `setTimeout` 顶替了 `requestAnimationFrame`，否则主循环压根不跑，测出来的结论都是假的。
