@@ -15,7 +15,7 @@
   --ytt-shadow: 0 10px 30px rgba(0, 0, 0, 0.26);
 
   font-family: "Roboto", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--ytt-fg);
   /* 关键：让字幕可以被划选 */
@@ -308,7 +308,7 @@ html[dark] .ytt-cue .ytt-text mark.is-current {
 
 /* 文本块比单行字幕长，行距松一点更好读 */
 #ytt-root .ytt-cue {
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .ytt-cue.is-active .ytt-text {
